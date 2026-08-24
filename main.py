@@ -1,4 +1,4 @@
-﻿import io
+import io
 import os
 import time
 import uuid
@@ -274,7 +274,6 @@ async def generate_sample_doc():
         "images": client_images
     }
 
-# Mount static folder
 base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
 if not os.path.exists(static_dir):
@@ -289,4 +288,4 @@ async def serve_index():
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>DocImagePrint UI Loaded</h1>"
+    return "<h1>DocImagePrint API</h1>"
