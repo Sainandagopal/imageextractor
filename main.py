@@ -1,4 +1,4 @@
-import io
+﻿import io
 import os
 import time
 import uuid
@@ -11,10 +11,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageDraw, ImageFont
 
-from app.extractor import DocumentImageExtractor, optimize_thumbnail
-from app.pdf_builder import PDFPrintBuilder
+try:
+    from extractor import DocumentImageExtractor, optimize_thumbnail
+    from pdf_builder import PDFPrintBuilder
+except ImportError:
+    from app.extractor import DocumentImageExtractor, optimize_thumbnail
+    from app.pdf_builder import PDFPrintBuilder
 
-app = FastAPI(title="Document Image Extractor & Printout Layout", version="1.0.0")
+app = FastAPI(title="DocImagePrint", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +29,7 @@ app.add_middleware(
 )
 
 SESSION_STORE: Dict[str, Dict[str, Any]] = {}
-SESSION_EXPIRY_SECONDS = 3600 * 2  # 2 hours
+SESSION_EXPIRY_SECONDS = 3600 * 2
 
 def cleanup_old_sessions():
     now = time.time()
@@ -42,18 +46,18 @@ class PrintConfig(BaseModel):
     images_per_page: int = 9
     paper_size: str = "a4"
     orientation: str = "portrait"
-    margin: str = "standard"  # none, compact, standard, spacious
+    margin: str = "standard"
     gap: str = "standard"
-    fit_mode: str = "contain" # contain, cover
+    fit_mode: str = "contain"
     show_cut_lines: bool = False
     show_labels: bool = False
     show_page_numbers: bool = True
 
 MARGIN_MAP = {
     "none": 0.0,
-    "compact": 14.17,   # ~5mm
-    "standard": 28.35,  # ~10mm
-    "spacious": 42.52   # ~15mm
+    "compact": 14.17,
+    "standard": 28.35,
+    "spacious": 42.52
 }
 
 GAP_MAP = {
@@ -80,7 +84,7 @@ async def upload_document(files: List[UploadFile] = File(...)):
     if not all_extracted:
         return {
             "status": "error",
-            "message": "No images found in the uploaded file(s). Ensure the document contains images or pages.",
+            "message": "No images found in the uploaded file(s).",
             "session_id": session_id,
             "images": []
         }
@@ -127,7 +131,7 @@ async def get_image(session_id: str, img_id: str):
 async def generate_printable_pdf(config: PrintConfig):
     session = SESSION_STORE.get(config.session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session expired or not found. Please re-upload your document.")
+        raise HTTPException(status_code=404, detail="Session expired or not found.")
         
     ordered_images = []
     for img_id in config.image_ids:
@@ -195,21 +199,20 @@ async def download_images_zip(config: PrintConfig):
 
 @app.post("/api/generate-sample")
 async def generate_sample_doc():
-    """Generates a sample document containing 9 vibrant sample photos to test the app."""
     cleanup_old_sessions()
     session_id = str(uuid.uuid4())
     
     sample_images = []
     colors = [
-        ("#3b82f6", "#1d4ed8", "Landscape Mountain View"),
-        ("#ec4899", "#be185d", "City Sunset Horizon"),
-        ("#10b981", "#047857", "Tropical Forest Nature"),
-        ("#f59e0b", "#b45309", "Golden Desert Dunes"),
-        ("#8b5cf6", "#6d28d9", "Space Nebula Stars"),
-        ("#06b6d4", "#0e7490", "Ocean Coral Reef"),
-        ("#f43f5e", "#be123c", "Autumn Red Maple"),
-        ("#84cc16", "#4d7c0f", "Spring Blossom Flora"),
-        ("#6366f1", "#4338ca", "Architecture Geometry"),
+        ("#dc2626", "#991b1b", "Crimson Mountain Sunrise"),
+        ("#e11d48", "#9f1239", "Rose City Horizon"),
+        ("#059669", "#065f46", "Emerald Forest Nature"),
+        ("#d97706", "#92400e", "Amber Desert Vista"),
+        ("#7c3aed", "#5b21b6", "Cosmic Violet Stars"),
+        ("#0284c7", "#075985", "Deep Blue Ocean Reef"),
+        ("#ea580c", "#9a3412", "Autumn Maple Woods"),
+        ("#65a30d", "#3f6212", "Spring Blossom Flora"),
+        ("#4f46e5", "#3730a3", "Modern Architecture"),
     ]
     
     for idx, (c1, c2, title) in enumerate(colors):
@@ -217,7 +220,7 @@ async def generate_sample_doc():
         draw = ImageDraw.Draw(img)
         for y in range(450):
             r_ratio = y / 450.0
-            draw.line([(0, y), (600, y)], fill=(int(40 + r_ratio*60), int(50 + r_ratio*80), int(120 + r_ratio*100)))
+            draw.line([(0, y), (600, y)], fill=(int(30 + r_ratio*50), int(30 + r_ratio*50), int(60 + r_ratio*80)))
             
         draw.rectangle([(20, 20), (580, 430)], outline="white", width=3)
         draw.rectangle([(40, 40), (560, 350)], fill=c2)
@@ -271,8 +274,14 @@ async def generate_sample_doc():
         "images": client_images
     }
 
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+# Mount static folder
+base_dir = os.path.dirname(os.path.abspath(__file__))
+static_dir = os.path.join(base_dir, "static")
+if not os.path.exists(static_dir):
+    static_dir = os.path.join(base_dir, "app", "static")
+
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -280,4 +289,4 @@ async def serve_index():
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>Doc Image Extractor & Printout Layout API</h1>"
+    return "<h1>DocImagePrint UI Loaded</h1>"
