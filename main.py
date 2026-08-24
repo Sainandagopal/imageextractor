@@ -1,4 +1,4 @@
-import io
+﻿import io
 import os
 import time
 import uuid
@@ -11,8 +11,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageDraw, ImageFont
 
-from app.extractor import DocumentImageExtractor, optimize_thumbnail
-from app.pdf_builder import PDFPrintBuilder
+try:
+    from app.extractor import DocumentImageExtractor, optimize_thumbnail
+    from app.pdf_builder import PDFPrintBuilder
+except ImportError:
+    from extractor import DocumentImageExtractor, optimize_thumbnail
+    from pdf_builder import PDFPrintBuilder
 
 app = FastAPI(title="Document Image Extractor & Printout Layout", version="1.0.0")
 
@@ -42,18 +46,18 @@ class PrintConfig(BaseModel):
     images_per_page: int = 9
     paper_size: str = "a4"
     orientation: str = "portrait"
-    margin: str = "standard"  # none, compact, standard, spacious
+    margin: str = "standard"
     gap: str = "standard"
-    fit_mode: str = "contain" # contain, cover
+    fit_mode: str = "contain"
     show_cut_lines: bool = False
     show_labels: bool = False
     show_page_numbers: bool = True
 
 MARGIN_MAP = {
     "none": 0.0,
-    "compact": 14.17,   # ~5mm
-    "standard": 28.35,  # ~10mm
-    "spacious": 42.52   # ~15mm
+    "compact": 14.17,
+    "standard": 28.35,
+    "spacious": 42.52
 }
 
 GAP_MAP = {
@@ -195,7 +199,6 @@ async def download_images_zip(config: PrintConfig):
 
 @app.post("/api/generate-sample")
 async def generate_sample_doc():
-    """Generates a sample document containing 9 vibrant sample photos to test the app."""
     cleanup_old_sessions()
     session_id = str(uuid.uuid4())
     
@@ -271,8 +274,13 @@ async def generate_sample_doc():
         "images": client_images
     }
 
+# Check static location (works whether static is in ./static or ./app/static)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+if not os.path.exists(static_dir):
+    static_dir = os.path.join(os.path.dirname(__file__), "app", "static")
+
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -280,4 +288,4 @@ async def serve_index():
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>Doc Image Extractor & Printout Layout API</h1>"
+    return "<h1>DocImagePrint API</h1>"
